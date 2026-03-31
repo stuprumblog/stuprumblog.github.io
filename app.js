@@ -22,22 +22,44 @@ let currentUser = null;
 onAuthStateChanged(auth, u => { currentUser = u; });
 
 let allPostsFlat = null;
+let fullSearchIndex = null;
+let commentsMap = {};
 let searchTimeout = null;
+
+// Persistent navigation state
+let navState = { type: 'home', page: 0 };
 
 const postList = document.getElementById('post-list');
 const postView = document.getElementById('post-view');
 const pagination = document.getElementById('pagination');
 const progressBar = document.getElementById('progress-bar');
 
-window.showHome = showHome;
+window.showHome = (p) => { navState = { type: 'home', page: p || 0 }; showHome(p); };
 window.openPost = openPost;
 window.onSearch = onSearch;
-window.filterTag = filterTag;
+window.filterTag = (t) => { navState = { type: 'tag', tag: t }; filterTag(t); };
 window.doSignIn = doSignIn;
 window.doSignOut = doSignOut;
 window.submitComment = submitComment;
+window.goBack = goBack;
 
-showHome();
+// Initial load
+(async () => {
+  try {
+    const comments = await fetchJSON('comments.json');
+    comments.forEach(c => {
+      commentsMap[c.postId] = (commentsMap[c.postId] || 0) + 1;
+    });
+  } catch (e) { console.warn('Could not load comments.json', e); }
+  showHome();
+})();
+
+function goBack() {
+  if (navState.type === 'home') showHome(navState.page);
+  else if (navState.type === 'tag') filterTag(navState.tag);
+  else if (navState.type === 'search') doSearch(navState.q);
+  else showHome();
+}
 
 window.addEventListener('scroll', () => {
   if (!postView.classList.contains('hidden')) {
@@ -55,6 +77,10 @@ function fmt(d) {
 function readTime(c) {
   return Math.max(1, Math.round(c.replace(/<[^>]+>/g, '').split(/\s+/).length / 200)) + ' min čtení';
 }
+function getCommentBadge(filename) {
+  const count = commentsMap[filename] || 0;
+  return count > 0 ? `<div class="post-comment-count">Komentáře: ${count}</div>` : '';
+}
 async function fetchJSON(url) { return (await fetch(url)).json(); }
 
 // ── Home ──
@@ -71,13 +97,14 @@ async function showHome(page = 0) {
 }
 
 function renderMagazine(posts) {
-  const hero = posts[0], grid = posts.slice(1, 7);
+  const hero = posts[0], grid = posts.slice(1, 10);
   postList.innerHTML = `
     <div class="magazine fade-in">
       <div class="hero-post" onclick="openPost(${hero.id})">
         <div class="hero-label">nejnovější</div>
         <h2 class="hero-title">${hero.title}</h2>
         <div class="hero-meta">${fmt(hero.published)}${hero.snippet ? ' — ' + hero.snippet.slice(0, 120) + '…' : ''}</div>
+        ${getCommentBadge(hero.filename)}
         ${hero.tags.length ? `<div class="post-tags">${hero.tags.slice(0, 4).map(t => `<span class="tag" onclick="event.stopPropagation();filterTag('${t}')">${t}</span>`).join('')}</div>` : ''}
       </div>
       <div class="grid-posts">
@@ -85,6 +112,7 @@ function renderMagazine(posts) {
           <div class="grid-post" onclick="openPost(${p.id})">
             <div class="grid-post-date">${fmt(p.published)}</div>
             <div class="grid-post-title">${p.title}</div>
+            ${getCommentBadge(p.filename)}
             ${p.snippet ? `<div class="grid-post-snippet">${p.snippet.slice(0, 90)}…</div>` : ''}
           </div>`).join('')}
       </div>
@@ -99,6 +127,7 @@ function renderList(posts, page) {
         <div class="post-item" onclick="openPost(${p.id})">
           <div class="post-title">${p.title}</div>
           <div class="post-date">${fmt(p.published)}</div>
+          ${getCommentBadge(p.filename)}
           ${p.snippet ? `<div class="post-snippet">${p.snippet}</div>` : ''}
           ${p.tags.length ? `<div class="post-tags">${p.tags.slice(0, 5).map(t => `<span class="tag" onclick="event.stopPropagation();filterTag('${t}')">${t}</span>`).join('')}</div>` : ''}
         </div>`).join('')}
@@ -281,20 +310,53 @@ function onSearch(val) {
   searchTimeout = setTimeout(() => doSearch(val.trim().toLowerCase()), 300);
 }
 
+
+
 async function doSearch(q) {
   postView.classList.add('hidden');
   postList.classList.remove('hidden');
   pagination.innerHTML = '';
-  postList.innerHTML = '<div class="loading">hledám</div>';
-  if (!allPostsFlat) {
-    const meta = await fetchJSON('data/meta.json');
-    allPostsFlat = (await Promise.all(Array.from({ length: meta.pages }, (_, i) => fetchJSON(`data/index_${i}.json`)))).flat();
+  postList.innerHTML = '<div class="loading">prohledávám celé texty</div>';
+  
+  if (!fullSearchIndex) {
+    fullSearchIndex = await fetchJSON('data/search.json');
   }
-  const results = allPostsFlat.filter(p => p.title.toLowerCase().includes(q) || p.snippet.toLowerCase().includes(q) || p.tags.some(t => t.toLowerCase().includes(q)));
+
+  const queries = q.toLowerCase().split(/\s+/).filter(x => x.length > 0);
+  const results = fullSearchIndex.filter(p => {
+    const text = (p.title + ' ' + (p.tags||[]).join(' ') + ' ' + p.text).toLowerCase();
+    return queries.every(word => text.includes(word));
+  });
+
   postList.innerHTML = !results.length
     ? `<div class="search-header">Žádné výsledky pro „${q}"</div>`
     : `<div class="search-header fade-in">Nalezeno ${results.length} příspěvků pro „${q}"</div>
-       <div class="fade-in">${results.slice(0, 50).map(p => `<div class="post-item" onclick="openPost(${p.id})"><div class="post-title">${p.title}</div><div class="post-date">${fmt(p.published)}</div>${p.snippet ? `<div class="post-snippet">${p.snippet}</div>` : ''}</div>`).join('')}</div>`;
+       <div class="fade-in search-results-container">
+         ${results.slice(0, 100).map(p => `
+           <div class="post-item" onclick="openPost(${p.id})">
+             <div class="post-title">${p.title}</div>
+             <div class="post-date">${p.published ? fmt(p.published) : 'ID: ' + p.id}</div>
+             <div class="post-snippet">${getSearchSnippet(p.text, queries)}</div>
+           </div>`).join('')}
+       </div>`;
+}
+
+function getSearchSnippet(text, queries) {
+  if (!text) return '';
+  const firstWord = queries[0] || '';
+  const idx = text.indexOf(firstWord);
+  if (idx === -1) return text.slice(0, 160) + '...';
+  const start = Math.max(0, idx - 60);
+  const end = Math.min(text.length, idx + 120);
+  let snippet = text.slice(start, end).trim();
+  if (start > 0) snippet = '...' + snippet;
+  if (end < text.length) snippet += '...';
+  // Optional: highlight words (too complex for one-liner wrap, but simple string replacement works)
+  queries.forEach(q => {
+    const re = new RegExp(`(${q})`, 'gi');
+    snippet = snippet.replace(re, '<span class="search-highlight">$1</span>');
+  });
+  return snippet;
 }
 
 async function filterTag(tag) {
@@ -302,6 +364,7 @@ async function filterTag(tag) {
   postList.classList.remove('hidden');
   pagination.innerHTML = '';
   postList.innerHTML = '<div class="loading">filtruji</div>';
+  
   if (!allPostsFlat) {
     const meta = await fetchJSON('data/meta.json');
     allPostsFlat = (await Promise.all(Array.from({ length: meta.pages }, (_, i) => fetchJSON(`data/index_${i}.json`)))).flat();
