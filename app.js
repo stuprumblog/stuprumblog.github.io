@@ -97,7 +97,7 @@ async function showHome(page = 0) {
 }
 
 function renderMagazine(posts) {
-  const hero = posts[0], grid = posts.slice(1, 10);
+  const hero = posts[0], grid = posts.slice(1, 7);
   postList.innerHTML = `
     <div class="magazine fade-in">
       <div class="hero-post" onclick="openPost(${hero.id})">
@@ -161,7 +161,7 @@ async function openPost(id) {
 
   postView.innerHTML = `
     <div class="fade-in">
-      <span class="back-btn" onclick="showHome()">← zpět</span>
+      <span class="back-btn" onclick="goBack()">← zpět</span>
       <div class="post-header">
         <h1 class="post-full-title">${post.title}</h1>
         <div class="post-meta">
