@@ -20,8 +20,8 @@ body {
   background: var(--bg);
   color: var(--text);
   font-family: var(--font-serif);
-  font-size: 18px;
-  line-height: 1.7;
+  font-size: 21px; /* Increased from 18px */
+  line-height: 1.75;
   min-height: 100vh;
 }
 
@@ -198,8 +198,8 @@ main {
 
 /* POST CONTENT */
 .post-content {
-  font-size: 1.05rem;
-  line-height: 1.85;
+  font-size: 1.15rem; /* Now approx 24px */
+  line-height: 1.9;
   color: var(--text);
 }
 .post-content p { margin-bottom: 1.4em; }

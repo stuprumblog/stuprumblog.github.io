@@ -169,8 +169,8 @@ function renderWithPretext(htmlContent, container) {
   const IMG_W = Math.floor(containerWidth * 0.40);
   const GAP = 20;
   const TEXT_W = containerWidth - IMG_W - GAP;
-  const FONT = '18px "Cormorant Garamond", Georgia, serif';
-  const LINE_H = 18 * 1.85;
+  const FONT = '24px "Cormorant Garamond", Georgia, serif';
+  const LINE_H = 24 * 1.9;
   const GROUP = 3; // paragraphs per image
   let imgIdx = 0;
 
