@@ -4,6 +4,8 @@ import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChang
   from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 import { getFirestore, collection, addDoc, query, where, orderBy, getDocs, serverTimestamp }
   from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { getAnalytics, logEvent }
+  from "https://www.gstatic.com/firebasejs/10.12.0/firebase-analytics.js";
 
 const FIREBASE_CONFIG = {
   apiKey: "AIzaSyDjJKW_XmWE7ayzYQO8XSOx6XdtG1SDcr8",
@@ -18,6 +20,8 @@ const FIREBASE_CONFIG = {
 const fbApp = initializeApp(FIREBASE_CONFIG);
 const auth = getAuth(fbApp);
 const db = getFirestore(fbApp);
+const analytics = getAnalytics(fbApp);
+
 let currentUser = null;
 onAuthStateChanged(auth, u => { currentUser = u; });
 
@@ -94,6 +98,9 @@ async function showHome(page = 0) {
   const [meta, posts] = await Promise.all([fetchJSON('data/meta.json'), fetchJSON(`data/index_${page}.json`)]);
   page === 0 ? renderMagazine(posts) : renderList(posts, page);
   renderPagination(page, meta);
+  
+  logEvent(analytics, 'page_view', { page_title: `Home - Page ${page}`, page_location: location.href, page_path: `/?p=${page}` });
+  logEvent(analytics, 'screen_view', { firebase_screen: `Home - Page ${page}`, firebase_screen_class: 'HomeView' });
 }
 
 function renderMagazine(posts) {
@@ -134,19 +141,23 @@ function renderList(posts, page) {
     </div>`;
 }
 
-function renderPagination(cur, meta) {
-  const total = meta.pages;
-  const pages = new Set([0]);
-  for (let i = Math.max(0, cur - 2); i <= Math.min(total - 1, cur + 2); i++) pages.add(i);
-  pages.add(total - 1);
-  const sorted = [...pages].sort((a, b) => a - b);
-  let html = '', prev = -1;
-  for (const p of sorted) {
-    if (p - prev > 1) html += `<span class="page-ellipsis">…</span>`;
-    html += `<button class="page-btn ${p === cur ? 'active' : ''}" onclick="showHome(${p})">${p}</button>`;
-    prev = p;
+function renderPagination(current, meta) {
+  if (meta.pages <= 1) return;
+  const btns = [];
+  const range = 2;
+  const addBtn = (i, label, active = false) => {
+    btns.push(`<button class="page-btn ${active ? 'active' : ''}" onclick="showHome(${i})">${label || i}</button>`);
+  };
+  if (current > 0) addBtn(current - 1, '←');
+  for (let i = 0; i < meta.pages; i++) {
+    if (i === 0 || i === meta.pages - 1 || (i >= current - range && i <= current + range)) {
+      addBtn(i, i, i === current);
+    } else if (i === current - range - 1 || i === current + range + 1) {
+      btns.push('<span class="page-ellipsis">…</span>');
+    }
   }
-  pagination.innerHTML = html;
+  if (current < meta.pages - 1) addBtn(current + 1, '→');
+  pagination.innerHTML = btns.join('');
 }
 
 // ── Post view ──
@@ -177,73 +188,55 @@ async function openPost(id) {
   const el = document.getElementById('post-content-body');
   post.content ? renderWithPretext(post.content, el) : (el.innerHTML = '<p class="empty-post">Tento příspěvek nemá obsah.</p>');
   loadComments(post.filename || String(id));
+  
+  logEvent(analytics, 'page_view', { page_title: post.title, page_location: location.href, page_path: post.filename });
+  logEvent(analytics, 'screen_view', { firebase_screen: post.title, firebase_screen_class: 'PostView' });
 }
 
 // ── Real Pretext layout ──
-// Uses prepare() + layout() to measure how tall text will be beside an image,
-// so images are sized to match their adjacent text block precisely.
 function renderWithPretext(htmlContent, container) {
   const doc = new DOMParser().parseFromString(htmlContent, 'text/html');
   const images = [...doc.body.querySelectorAll('img')];
   images.forEach(img => img.remove());
-
-  // No images — plain render
   if (!images.length) { container.innerHTML = doc.body.innerHTML; return; }
-
-  const blocks = [...doc.body.childNodes].filter(n =>
-    n.nodeType === 1 ? n.textContent.trim() : n.textContent.trim()
-  );
-
+  const blocks = [...doc.body.childNodes].filter(n => n.nodeType === 1 ? n.textContent.trim() : n.textContent.trim());
   const containerWidth = container.closest('#post-view')?.offsetWidth || 680;
   const IMG_W = Math.floor(containerWidth * 0.40);
   const GAP = 20;
   const TEXT_W = containerWidth - IMG_W - GAP;
   const FONT = '24px "Cormorant Garamond", Georgia, serif';
   const LINE_H = 24 * 1.9;
-  const GROUP = 3; // paragraphs per image
+  const GROUP = 3;
   let imgIdx = 0;
-
-  // Walk blocks in groups, pairing with images
   for (let g = 0; g < blocks.length; g += GROUP) {
     const group = blocks.slice(g, g + GROUP);
     const img = images[imgIdx];
-
     if (img) {
       imgIdx++;
-
-      // Measure combined text height with Pretext
       const combinedText = group.map(n => n.textContent || '').join(' ').trim();
-      let textHeight = LINE_H * 4; // fallback
+      let textHeight = LINE_H * 4;
       if (combinedText) {
         const prepared = prepare(combinedText, FONT);
         const result = layout(prepared, TEXT_W, LINE_H);
         textHeight = result.height;
       }
-
       const imgH = Math.max(100, Math.min(Math.round(textHeight), 400));
       const dir = (imgIdx % 2 === 0) ? 'right' : 'left';
-
       const section = document.createElement('div');
       section.className = 'pretext-section';
       section.style.cssText = `display:flex; flex-direction:${dir === 'right' ? 'row-reverse' : 'row'}; gap:${GAP}px; margin-bottom:2em; align-items:flex-start;`;
-
       img.style.cssText = `width:${IMG_W}px; height:${imgH}px; object-fit:cover; flex-shrink:0; opacity:0.88; display:block;`;
       img.loading = 'lazy';
-
       const textDiv = document.createElement('div');
       textDiv.style.cssText = `flex:1; min-width:0;`;
       group.forEach(n => textDiv.appendChild(n.cloneNode(true)));
-
       section.appendChild(img);
       section.appendChild(textDiv);
       container.appendChild(section);
     } else {
-      // Remaining blocks after images run out
       group.forEach(n => container.appendChild(n.cloneNode(true)));
     }
   }
-
-  // Any leftover images
   const remaining = images.slice(imgIdx);
   if (remaining.length) {
     const row = document.createElement('div');
@@ -266,7 +259,6 @@ async function loadComments(postId) {
     const snap = await getDocs(query(collection(db, 'comments'), where('postId', '==', postId), orderBy('createdAt', 'asc')));
     snap.forEach(d => comments.push({ id: d.id, ...d.data() }));
   } catch (e) { }
-
   section.innerHTML = `
     <div class="comments-title">KOMENTÁŘE (${comments.length})</div>
     <div class="comment-list">
@@ -303,31 +295,27 @@ async function submitComment(postId) {
   catch (e) { console.error(e); }
 }
 
-// ── Search ──
+// ── Search & Tag ──
 function onSearch(val) {
   clearTimeout(searchTimeout);
   if (!val.trim()) { showHome(0); return; }
-  searchTimeout = setTimeout(() => doSearch(val.trim().toLowerCase()), 300);
+  searchTimeout = setTimeout(() => {
+    navState = { type: 'search', q: val.trim().toLowerCase() };
+    doSearch(navState.q);
+  }, 300);
 }
-
-
 
 async function doSearch(q) {
   postView.classList.add('hidden');
   postList.classList.remove('hidden');
   pagination.innerHTML = '';
   postList.innerHTML = '<div class="loading">prohledávám celé texty</div>';
-  
-  if (!fullSearchIndex) {
-    fullSearchIndex = await fetchJSON('data/search.json');
-  }
-
+  if (!fullSearchIndex) fullSearchIndex = await fetchJSON('data/search.json');
   const queries = q.toLowerCase().split(/\s+/).filter(x => x.length > 0);
   const results = fullSearchIndex.filter(p => {
     const text = (p.title + ' ' + (p.tags||[]).join(' ') + ' ' + p.text).toLowerCase();
     return queries.every(word => text.includes(word));
   });
-
   postList.innerHTML = !results.length
     ? `<div class="search-header">Žádné výsledky pro „${q}"</div>`
     : `<div class="search-header fade-in">Nalezeno ${results.length} příspěvků pro „${q}"</div>
@@ -336,9 +324,13 @@ async function doSearch(q) {
            <div class="post-item" onclick="openPost(${p.id})">
              <div class="post-title">${p.title}</div>
              <div class="post-date">${p.published ? fmt(p.published) : 'ID: ' + p.id}</div>
+             ${getCommentBadge(p.filename)}
              <div class="post-snippet">${getSearchSnippet(p.text, queries)}</div>
            </div>`).join('')}
        </div>`;
+  logEvent(analytics, 'search', { search_term: q });
+  logEvent(analytics, 'page_view', { page_title: `Search: ${q}`, page_location: location.href, page_path: `/?q=${q}` });
+  logEvent(analytics, 'screen_view', { firebase_screen: `Search: ${q}`, firebase_screen_class: 'SearchView' });
 }
 
 function getSearchSnippet(text, queries) {
@@ -351,7 +343,6 @@ function getSearchSnippet(text, queries) {
   let snippet = text.slice(start, end).trim();
   if (start > 0) snippet = '...' + snippet;
   if (end < text.length) snippet += '...';
-  // Optional: highlight words (too complex for one-liner wrap, but simple string replacement works)
   queries.forEach(q => {
     const re = new RegExp(`(${q})`, 'gi');
     snippet = snippet.replace(re, '<span class="search-highlight">$1</span>');
@@ -364,12 +355,20 @@ async function filterTag(tag) {
   postList.classList.remove('hidden');
   pagination.innerHTML = '';
   postList.innerHTML = '<div class="loading">filtruji</div>';
-  
   if (!allPostsFlat) {
     const meta = await fetchJSON('data/meta.json');
     allPostsFlat = (await Promise.all(Array.from({ length: meta.pages }, (_, i) => fetchJSON(`data/index_${i}.json`)))).flat();
   }
   const results = allPostsFlat.filter(p => p.tags.includes(tag));
   postList.innerHTML = `<div class="search-header fade-in">Štítek „${tag}" — ${results.length} příspěvků</div>
-    <div class="fade-in">${results.map(p => `<div class="post-item" onclick="openPost(${p.id})"><div class="post-title">${p.title}</div><div class="post-date">${fmt(p.published)}</div>${p.snippet ? `<div class="post-snippet">${p.snippet}</div>` : ''}</div>`).join('')}</div>`;
+    <div class="fade-in">${results.map(p => `
+      <div class="post-item" onclick="openPost(${p.id})">
+        <div class="post-title">${p.title}</div>
+        <div class="post-date">${fmt(p.published)}</div>
+        ${getCommentBadge(p.filename)}
+        ${p.snippet ? `<div class="post-snippet">${p.snippet}</div>` : ''}
+      </div>`).join('')}</div>`;
+  logEvent(analytics, 'select_content', { content_type: 'tag', item_id: tag });
+  logEvent(analytics, 'page_view', { page_title: `Tag: ${tag}`, page_location: location.href, page_path: `/?tag=${tag}` });
+  logEvent(analytics, 'screen_view', { firebase_screen: `Tag: ${tag}`, firebase_screen_class: 'TagView' });
 }
