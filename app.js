@@ -6,34 +6,35 @@ import { getFirestore, collection, addDoc, query, where, orderBy, getDocs, serve
   from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
 const FIREBASE_CONFIG = {
-  apiKey: "REPLACE_WITH_YOUR_API_KEY",
-  authDomain: "REPLACE.firebaseapp.com",
-  projectId: "REPLACE_WITH_YOUR_PROJECT_ID",
-  storageBucket: "REPLACE.appspot.com",
-  messagingSenderId: "REPLACE",
-  appId: "REPLACE"
+  apiKey: "AIzaSyDjJKW_XmWE7ayzYQO8XSOx6XdtG1SDcr8",
+  authDomain: "stuprumblog.firebaseapp.com",
+  projectId: "stuprumblog",
+  storageBucket: "stuprumblog.firebasestorage.app",
+  messagingSenderId: "442612700149",
+  appId: "1:442612700149:web:33720bb1d90c4b215186bc",
+  measurementId: "G-EHTSGRHC3K"
 };
 
 const fbApp = initializeApp(FIREBASE_CONFIG);
-const auth  = getAuth(fbApp);
-const db    = getFirestore(fbApp);
+const auth = getAuth(fbApp);
+const db = getFirestore(fbApp);
 let currentUser = null;
 onAuthStateChanged(auth, u => { currentUser = u; });
 
 let allPostsFlat = null;
 let searchTimeout = null;
 
-const postList    = document.getElementById('post-list');
-const postView    = document.getElementById('post-view');
-const pagination  = document.getElementById('pagination');
+const postList = document.getElementById('post-list');
+const postView = document.getElementById('post-view');
+const pagination = document.getElementById('pagination');
 const progressBar = document.getElementById('progress-bar');
 
-window.showHome      = showHome;
-window.openPost      = openPost;
-window.onSearch      = onSearch;
-window.filterTag     = filterTag;
-window.doSignIn      = doSignIn;
-window.doSignOut     = doSignOut;
+window.showHome = showHome;
+window.openPost = openPost;
+window.onSearch = onSearch;
+window.filterTag = filterTag;
+window.doSignIn = doSignIn;
+window.doSignOut = doSignOut;
 window.submitComment = submitComment;
 
 showHome();
@@ -49,10 +50,10 @@ window.addEventListener('scroll', () => {
 
 function fmt(d) {
   if (!d) return '';
-  return new Date(d).toLocaleDateString('cs-CZ', { day:'numeric', month:'long', year:'numeric' });
+  return new Date(d).toLocaleDateString('cs-CZ', { day: 'numeric', month: 'long', year: 'numeric' });
 }
 function readTime(c) {
-  return Math.max(1, Math.round(c.replace(/<[^>]+>/g,'').split(/\s+/).length / 200)) + ' min čtení';
+  return Math.max(1, Math.round(c.replace(/<[^>]+>/g, '').split(/\s+/).length / 200)) + ' min čtení';
 }
 async function fetchJSON(url) { return (await fetch(url)).json(); }
 
@@ -76,15 +77,15 @@ function renderMagazine(posts) {
       <div class="hero-post" onclick="openPost(${hero.id})">
         <div class="hero-label">nejnovější</div>
         <h2 class="hero-title">${hero.title}</h2>
-        <div class="hero-meta">${fmt(hero.published)}${hero.snippet ? ' — ' + hero.snippet.slice(0,120) + '…' : ''}</div>
-        ${hero.tags.length ? `<div class="post-tags">${hero.tags.slice(0,4).map(t=>`<span class="tag" onclick="event.stopPropagation();filterTag('${t}')">${t}</span>`).join('')}</div>` : ''}
+        <div class="hero-meta">${fmt(hero.published)}${hero.snippet ? ' — ' + hero.snippet.slice(0, 120) + '…' : ''}</div>
+        ${hero.tags.length ? `<div class="post-tags">${hero.tags.slice(0, 4).map(t => `<span class="tag" onclick="event.stopPropagation();filterTag('${t}')">${t}</span>`).join('')}</div>` : ''}
       </div>
       <div class="grid-posts">
-        ${grid.map(p=>`
+        ${grid.map(p => `
           <div class="grid-post" onclick="openPost(${p.id})">
             <div class="grid-post-date">${fmt(p.published)}</div>
             <div class="grid-post-title">${p.title}</div>
-            ${p.snippet ? `<div class="grid-post-snippet">${p.snippet.slice(0,90)}…</div>` : ''}
+            ${p.snippet ? `<div class="grid-post-snippet">${p.snippet.slice(0, 90)}…</div>` : ''}
           </div>`).join('')}
       </div>
     </div>`;
@@ -94,12 +95,12 @@ function renderList(posts, page) {
   postList.innerHTML = `
     <div class="list-header fade-in"><span class="list-page-label">strana ${page}</span></div>
     <div class="fade-in">
-      ${posts.map(p=>`
+      ${posts.map(p => `
         <div class="post-item" onclick="openPost(${p.id})">
           <div class="post-title">${p.title}</div>
           <div class="post-date">${fmt(p.published)}</div>
           ${p.snippet ? `<div class="post-snippet">${p.snippet}</div>` : ''}
-          ${p.tags.length ? `<div class="post-tags">${p.tags.slice(0,5).map(t=>`<span class="tag" onclick="event.stopPropagation();filterTag('${t}')">${t}</span>`).join('')}</div>` : ''}
+          ${p.tags.length ? `<div class="post-tags">${p.tags.slice(0, 5).map(t => `<span class="tag" onclick="event.stopPropagation();filterTag('${t}')">${t}</span>`).join('')}</div>` : ''}
         </div>`).join('')}
     </div>`;
 }
@@ -107,13 +108,13 @@ function renderList(posts, page) {
 function renderPagination(cur, meta) {
   const total = meta.pages;
   const pages = new Set([0]);
-  for (let i = Math.max(0, cur-2); i <= Math.min(total-1, cur+2); i++) pages.add(i);
-  pages.add(total-1);
-  const sorted = [...pages].sort((a,b)=>a-b);
+  for (let i = Math.max(0, cur - 2); i <= Math.min(total - 1, cur + 2); i++) pages.add(i);
+  pages.add(total - 1);
+  const sorted = [...pages].sort((a, b) => a - b);
   let html = '', prev = -1;
   for (const p of sorted) {
     if (p - prev > 1) html += `<span class="page-ellipsis">…</span>`;
-    html += `<button class="page-btn ${p===cur?'active':''}" onclick="showHome(${p})">${p}</button>`;
+    html += `<button class="page-btn ${p === cur ? 'active' : ''}" onclick="showHome(${p})">${p}</button>`;
     prev = p;
   }
   pagination.innerHTML = html;
@@ -165,18 +166,18 @@ function renderWithPretext(htmlContent, container) {
   );
 
   const containerWidth = container.closest('#post-view')?.offsetWidth || 680;
-  const IMG_W   = Math.floor(containerWidth * 0.40);
-  const GAP     = 20;
-  const TEXT_W  = containerWidth - IMG_W - GAP;
-  const FONT    = '18px "Cormorant Garamond", Georgia, serif';
-  const LINE_H  = 18 * 1.85;
-  const GROUP   = 3; // paragraphs per image
-  let imgIdx    = 0;
+  const IMG_W = Math.floor(containerWidth * 0.40);
+  const GAP = 20;
+  const TEXT_W = containerWidth - IMG_W - GAP;
+  const FONT = '18px "Cormorant Garamond", Georgia, serif';
+  const LINE_H = 18 * 1.85;
+  const GROUP = 3; // paragraphs per image
+  let imgIdx = 0;
 
   // Walk blocks in groups, pairing with images
   for (let g = 0; g < blocks.length; g += GROUP) {
     const group = blocks.slice(g, g + GROUP);
-    const img   = images[imgIdx];
+    const img = images[imgIdx];
 
     if (img) {
       imgIdx++;
@@ -186,16 +187,16 @@ function renderWithPretext(htmlContent, container) {
       let textHeight = LINE_H * 4; // fallback
       if (combinedText) {
         const prepared = prepare(combinedText, FONT);
-        const result   = layout(prepared, TEXT_W, LINE_H);
-        textHeight     = result.height;
+        const result = layout(prepared, TEXT_W, LINE_H);
+        textHeight = result.height;
       }
 
       const imgH = Math.max(100, Math.min(Math.round(textHeight), 400));
-      const dir  = (imgIdx % 2 === 0) ? 'right' : 'left';
+      const dir = (imgIdx % 2 === 0) ? 'right' : 'left';
 
       const section = document.createElement('div');
       section.className = 'pretext-section';
-      section.style.cssText = `display:flex; flex-direction:${dir==='right'?'row-reverse':'row'}; gap:${GAP}px; margin-bottom:2em; align-items:flex-start;`;
+      section.style.cssText = `display:flex; flex-direction:${dir === 'right' ? 'row-reverse' : 'row'}; gap:${GAP}px; margin-bottom:2em; align-items:flex-start;`;
 
       img.style.cssText = `width:${IMG_W}px; height:${imgH}px; object-fit:cover; flex-shrink:0; opacity:0.88; display:block;`;
       img.loading = 'lazy';
@@ -233,16 +234,16 @@ async function loadComments(postId) {
   if (!section) return;
   let comments = [];
   try {
-    const snap = await getDocs(query(collection(db,'comments'), where('postId','==',postId), orderBy('createdAt','asc')));
-    snap.forEach(d => comments.push({id:d.id,...d.data()}));
-  } catch(e) {}
+    const snap = await getDocs(query(collection(db, 'comments'), where('postId', '==', postId), orderBy('createdAt', 'asc')));
+    snap.forEach(d => comments.push({ id: d.id, ...d.data() }));
+  } catch (e) { }
 
   section.innerHTML = `
     <div class="comments-title">KOMENTÁŘE (${comments.length})</div>
     <div class="comment-list">
       ${!comments.length
-        ? '<div class="no-comments">Zatím žádné komentáře.</div>'
-        : comments.map(c=>`
+      ? '<div class="no-comments">Zatím žádné komentáře.</div>'
+      : comments.map(c => `
           <div class="comment">
             <div class="comment-author">${c.authorName}<span class="comment-date">${c.createdAt?.toDate ? fmt(c.createdAt.toDate()) : ''}</span></div>
             <div class="comment-text">${c.text}</div>
@@ -258,19 +259,19 @@ function renderCommentForm(postId) {
     </div>
     <textarea class="comment-textarea" id="comment-text" placeholder="Napište komentář…"></textarea>
     <button class="submit-btn" onclick="submitComment('${postId}')">Odeslat</button>`
-  : `<button class="google-btn" onclick="doSignIn('${postId}')">Přihlásit přes Google a komentovat</button>`;
+    : `<button class="google-btn" onclick="doSignIn('${postId}')">Přihlásit přes Google a komentovat</button>`;
 }
 
 async function doSignIn(postId) {
   try { await signInWithPopup(auth, new GoogleAuthProvider()); document.getElementById('comment-form').innerHTML = renderCommentForm(postId); }
-  catch(e) { console.error(e); }
+  catch (e) { console.error(e); }
 }
 async function doSignOut() { await signOut(auth); location.reload(); }
 async function submitComment(postId) {
   const text = document.getElementById('comment-text')?.value?.trim();
   if (!text || !currentUser) return;
-  try { await addDoc(collection(db,'comments'), {postId, text, authorName:currentUser.displayName, authorPhoto:currentUser.photoURL, createdAt:serverTimestamp()}); loadComments(postId); }
-  catch(e) { console.error(e); }
+  try { await addDoc(collection(db, 'comments'), { postId, text, authorName: currentUser.displayName, authorPhoto: currentUser.photoURL, createdAt: serverTimestamp() }); loadComments(postId); }
+  catch (e) { console.error(e); }
 }
 
 // ── Search ──
@@ -287,13 +288,13 @@ async function doSearch(q) {
   postList.innerHTML = '<div class="loading">hledám</div>';
   if (!allPostsFlat) {
     const meta = await fetchJSON('data/meta.json');
-    allPostsFlat = (await Promise.all(Array.from({length:meta.pages},(_,i)=>fetchJSON(`data/index_${i}.json`)))).flat();
+    allPostsFlat = (await Promise.all(Array.from({ length: meta.pages }, (_, i) => fetchJSON(`data/index_${i}.json`)))).flat();
   }
-  const results = allPostsFlat.filter(p => p.title.toLowerCase().includes(q) || p.snippet.toLowerCase().includes(q) || p.tags.some(t=>t.toLowerCase().includes(q)));
+  const results = allPostsFlat.filter(p => p.title.toLowerCase().includes(q) || p.snippet.toLowerCase().includes(q) || p.tags.some(t => t.toLowerCase().includes(q)));
   postList.innerHTML = !results.length
     ? `<div class="search-header">Žádné výsledky pro „${q}"</div>`
     : `<div class="search-header fade-in">Nalezeno ${results.length} příspěvků pro „${q}"</div>
-       <div class="fade-in">${results.slice(0,50).map(p=>`<div class="post-item" onclick="openPost(${p.id})"><div class="post-title">${p.title}</div><div class="post-date">${fmt(p.published)}</div>${p.snippet?`<div class="post-snippet">${p.snippet}</div>`:''}</div>`).join('')}</div>`;
+       <div class="fade-in">${results.slice(0, 50).map(p => `<div class="post-item" onclick="openPost(${p.id})"><div class="post-title">${p.title}</div><div class="post-date">${fmt(p.published)}</div>${p.snippet ? `<div class="post-snippet">${p.snippet}</div>` : ''}</div>`).join('')}</div>`;
 }
 
 async function filterTag(tag) {
@@ -303,9 +304,9 @@ async function filterTag(tag) {
   postList.innerHTML = '<div class="loading">filtruji</div>';
   if (!allPostsFlat) {
     const meta = await fetchJSON('data/meta.json');
-    allPostsFlat = (await Promise.all(Array.from({length:meta.pages},(_,i)=>fetchJSON(`data/index_${i}.json`)))).flat();
+    allPostsFlat = (await Promise.all(Array.from({ length: meta.pages }, (_, i) => fetchJSON(`data/index_${i}.json`)))).flat();
   }
   const results = allPostsFlat.filter(p => p.tags.includes(tag));
   postList.innerHTML = `<div class="search-header fade-in">Štítek „${tag}" — ${results.length} příspěvků</div>
-    <div class="fade-in">${results.map(p=>`<div class="post-item" onclick="openPost(${p.id})"><div class="post-title">${p.title}</div><div class="post-date">${fmt(p.published)}</div>${p.snippet?`<div class="post-snippet">${p.snippet}</div>`:''}</div>`).join('')}</div>`;
+    <div class="fade-in">${results.map(p => `<div class="post-item" onclick="openPost(${p.id})"><div class="post-title">${p.title}</div><div class="post-date">${fmt(p.published)}</div>${p.snippet ? `<div class="post-snippet">${p.snippet}</div>` : ''}</div>`).join('')}</div>`;
 }
