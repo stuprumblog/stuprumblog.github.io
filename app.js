@@ -62,7 +62,10 @@ window.goBack = goBack;
     snap.forEach(d => {
       const c = d.data();
       if (c.postId) {
-        commentsMap[c.postId] = (commentsMap[c.postId] || 0) + 1;
+        const isDuplicate = staticComments.some(sc => sc.postId === c.postId && sc.text === c.text && sc.authorName === c.authorName);
+        if (!isDuplicate) {
+          commentsMap[c.postId] = (commentsMap[c.postId] || 0) + 1;
+        }
       }
     });
   } catch (e) { console.warn('Could not load Firestore comments', e); }
@@ -123,7 +126,7 @@ function renderMagazine(posts) {
         <div class="hero-label">nejnovější</div>
         <h2 class="hero-title">${hero.title}</h2>
         <div class="hero-meta">${fmt(hero.published)}${hero.snippet ? ' — ' + hero.snippet.slice(0, 120) + '…' : ''}</div>
-        ${getCommentBadge(hero.filename)}
+        ${getCommentBadge(hero.filename || String(hero.id))}
         ${hero.tags.length ? `<div class="post-tags">${hero.tags.slice(0, 4).map(t => `<span class="tag" onclick="event.stopPropagation();filterTag('${t}')">${t}</span>`).join('')}</div>` : ''}
       </div>
       <div class="grid-posts">
@@ -131,7 +134,7 @@ function renderMagazine(posts) {
           <div class="grid-post" onclick="openPost(${p.id})">
             <div class="grid-post-date">${fmt(p.published)}</div>
             <div class="grid-post-title">${p.title}</div>
-            ${getCommentBadge(p.filename)}
+            ${getCommentBadge(p.filename || String(p.id))}
             ${p.snippet ? `<div class="grid-post-snippet">${p.snippet.slice(0, 90)}…</div>` : ''}
           </div>`).join('')}
       </div>
@@ -146,7 +149,7 @@ function renderList(posts, page) {
         <div class="post-item" onclick="openPost(${p.id})">
           <div class="post-title">${p.title}</div>
           <div class="post-date">${fmt(p.published)}</div>
-          ${getCommentBadge(p.filename)}
+          ${getCommentBadge(p.filename || String(p.id))}
           ${p.snippet ? `<div class="post-snippet">${p.snippet}</div>` : ''}
           ${p.tags.length ? `<div class="post-tags">${p.tags.slice(0, 5).map(t => `<span class="tag" onclick="event.stopPropagation();filterTag('${t}')">${t}</span>`).join('')}</div>` : ''}
         </div>`).join('')}
@@ -352,7 +355,7 @@ async function doSearch(q) {
            <div class="post-item" onclick="openPost(${p.id})">
              <div class="post-title">${p.title}</div>
              <div class="post-date">${p.published ? fmt(p.published) : 'ID: ' + p.id}</div>
-             ${getCommentBadge(p.filename)}
+             ${getCommentBadge(p.filename || String(p.id))}
              <div class="post-snippet">${getSearchSnippet(p.text, queries)}</div>
            </div>`).join('')}
        </div>`;
@@ -393,7 +396,7 @@ async function filterTag(tag) {
       <div class="post-item" onclick="openPost(${p.id})">
         <div class="post-title">${p.title}</div>
         <div class="post-date">${fmt(p.published)}</div>
-        ${getCommentBadge(p.filename)}
+        ${getCommentBadge(p.filename || String(p.id))}
         ${p.snippet ? `<div class="post-snippet">${p.snippet}</div>` : ''}
       </div>`).join('')}</div>`;
   logEvent(analytics, 'select_content', { content_type: 'tag', item_id: tag });
