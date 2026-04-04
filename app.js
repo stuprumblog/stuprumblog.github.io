@@ -27,6 +27,7 @@ onAuthStateChanged(auth, u => { currentUser = u; });
 
 let allPostsFlat = null;
 let fullSearchIndex = null;
+let staticComments = [];
 let commentsMap = {};
 let searchTimeout = null;
 
@@ -50,11 +51,22 @@ window.goBack = goBack;
 // Initial load
 (async () => {
   try {
-    const comments = await fetchJSON('comments.json');
-    comments.forEach(c => {
+    staticComments = await fetchJSON('comments.json');
+    staticComments.forEach(c => {
       commentsMap[c.postId] = (commentsMap[c.postId] || 0) + 1;
     });
   } catch (e) { console.warn('Could not load comments.json', e); }
+
+  try {
+    const snap = await getDocs(collection(db, 'comments'));
+    snap.forEach(d => {
+      const c = d.data();
+      if (c.postId) {
+        commentsMap[c.postId] = (commentsMap[c.postId] || 0) + 1;
+      }
+    });
+  } catch (e) { console.warn('Could not load Firestore comments', e); }
+
   showHome();
 })();
 
@@ -254,11 +266,23 @@ function renderWithPretext(htmlContent, container) {
 async function loadComments(postId) {
   const section = document.getElementById('comments-section');
   if (!section) return;
-  let comments = [];
+  let comments = staticComments.filter(c => c.postId === postId);
   try {
     const snap = await getDocs(query(collection(db, 'comments'), where('postId', '==', postId), orderBy('createdAt', 'asc')));
-    snap.forEach(d => comments.push({ id: d.id, ...d.data() }));
+    snap.forEach(d => {
+      const data = d.data();
+      if (!comments.find(c => c.text === data.text && c.authorName === data.authorName)) {
+        comments.push({ id: d.id, ...data });
+      }
+    });
   } catch (e) { }
+
+  comments.sort((a, b) => {
+    const dateA = a.createdAt?.toDate ? a.createdAt.toDate() : new Date(a.createdAt);
+    const dateB = b.createdAt?.toDate ? b.createdAt.toDate() : new Date(b.createdAt);
+    return dateA - dateB;
+  });
+
   section.innerHTML = `
     <div class="comments-title">KOMENTÁŘE (${comments.length})</div>
     <div class="comment-list">
@@ -266,7 +290,7 @@ async function loadComments(postId) {
       ? '<div class="no-comments">Zatím žádné komentáře.</div>'
       : comments.map(c => `
           <div class="comment">
-            <div class="comment-author">${c.authorName}<span class="comment-date">${c.createdAt?.toDate ? fmt(c.createdAt.toDate()) : ''}</span></div>
+            <div class="comment-author">${c.authorName || 'Anonym'}<span class="comment-date">${c.createdAt?.toDate ? fmt(c.createdAt.toDate()) : (c.createdAt ? fmt(c.createdAt) : '')}</span></div>
             <div class="comment-text">${c.text}</div>
           </div>`).join('')}
     </div>
@@ -291,7 +315,11 @@ async function doSignOut() { await signOut(auth); location.reload(); }
 async function submitComment(postId) {
   const text = document.getElementById('comment-text')?.value?.trim();
   if (!text || !currentUser) return;
-  try { await addDoc(collection(db, 'comments'), { postId, text, authorName: currentUser.displayName, authorPhoto: currentUser.photoURL, createdAt: serverTimestamp() }); loadComments(postId); }
+  try {
+    await addDoc(collection(db, 'comments'), { postId, text, authorName: currentUser.displayName, authorPhoto: currentUser.photoURL, createdAt: serverTimestamp() });
+    commentsMap[postId] = (commentsMap[postId] || 0) + 1;
+    loadComments(postId);
+  }
   catch (e) { console.error(e); }
 }
 
