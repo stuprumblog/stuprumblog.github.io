@@ -215,14 +215,19 @@ function renderWithPretext(htmlContent, container) {
   images.forEach(img => img.remove());
   if (!images.length) { container.innerHTML = doc.body.innerHTML; return; }
   const blocks = [...doc.body.childNodes].filter(n => n.nodeType === 1 ? n.textContent.trim() : n.textContent.trim());
+  
   const containerWidth = container.closest('#post-view')?.offsetWidth || 680;
-  const IMG_W = Math.floor(containerWidth * 0.40);
-  const GAP = 20;
-  const TEXT_W = containerWidth - IMG_W - GAP;
+  const isMobile = containerWidth < 500;
+  
+  const IMG_W = isMobile ? containerWidth : Math.floor(containerWidth * 0.40);
+  const GAP = isMobile ? 0 : 24;
+  const TEXT_W = isMobile ? containerWidth : (containerWidth - IMG_W - GAP);
+  
   const FONT = '24px "Cormorant Garamond", Georgia, serif';
   const LINE_H = 24 * 1.9;
   const GROUP = 3;
   let imgIdx = 0;
+
   for (let g = 0; g < blocks.length; g += GROUP) {
     const group = blocks.slice(g, g + GROUP);
     const img = images[imgIdx];
@@ -235,12 +240,22 @@ function renderWithPretext(htmlContent, container) {
         const result = layout(prepared, TEXT_W, LINE_H);
         textHeight = result.height;
       }
-      const imgH = Math.max(100, Math.min(Math.round(textHeight), 400));
+      
       const dir = (imgIdx % 2 === 0) ? 'right' : 'left';
       const section = document.createElement('div');
       section.className = 'pretext-section';
-      section.style.cssText = `display:flex; flex-direction:${dir === 'right' ? 'row-reverse' : 'row'}; gap:${GAP}px; margin-bottom:2em; align-items:flex-start;`;
-      img.style.cssText = `width:${IMG_W}px; height:${imgH}px; object-fit:cover; flex-shrink:0; opacity:0.88; display:block;`;
+      
+      if (isMobile) {
+        // Mobile: Stacked layout with better aspect ratio
+        section.style.cssText = `display:block; margin-bottom:3.5em;`;
+        img.style.cssText = `width:100%; height:auto; max-height:480px; object-fit:cover; margin-bottom:1.5em; opacity:0.95; display:block; border-bottom: 1px solid var(--border); padding-bottom: 0.5em;`;
+      } else {
+        // Desktop: Side-by-side "Pretext" layout
+        const imgH = Math.max(120, Math.min(Math.round(textHeight), 450));
+        section.style.cssText = `display:flex; flex-direction:${dir === 'right' ? 'row-reverse' : 'row'}; gap:${GAP}px; margin-bottom:3rem; align-items:flex-start;`;
+        img.style.cssText = `width:${IMG_W}px; height:${imgH}px; object-fit:cover; flex-shrink:0; opacity:0.9; display:block;`;
+      }
+
       img.loading = 'lazy';
       const textDiv = document.createElement('div');
       textDiv.style.cssText = `flex:1; min-width:0;`;
