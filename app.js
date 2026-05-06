@@ -8,7 +8,7 @@ import { getAnalytics, logEvent }
   from "https://www.gstatic.com/firebasejs/10.12.0/firebase-analytics.js";
 
 const FIREBASE_CONFIG = {
-  apiKey: "AIzaSyDjJKW_XmWE7ayzYQO8XSOx6XdtG1SDcr8",
+  apiKey: "AIzaSyCFMwy-SVQBC6h2AoOGmCTgIOpJCWVDiSQ",
   authDomain: "stuprumblog.firebaseapp.com",
   projectId: "stuprumblog",
   storageBucket: "stuprumblog.firebasestorage.app",
@@ -113,7 +113,7 @@ async function showHome(page = 0) {
   const [meta, posts] = await Promise.all([fetchJSON('data/meta.json'), fetchJSON(`data/index_${page}.json`)]);
   page === 0 ? renderMagazine(posts) : renderList(posts, page);
   renderPagination(page, meta);
-  
+
   logEvent(analytics, 'page_view', { page_title: `Home - Page ${page}`, page_location: location.href, page_path: `/?p=${page}` });
   logEvent(analytics, 'screen_view', { firebase_screen: `Home - Page ${page}`, firebase_screen_class: 'HomeView' });
 }
@@ -203,7 +203,7 @@ async function openPost(id) {
   const el = document.getElementById('post-content-body');
   post.content ? renderWithPretext(post.content, el) : (el.innerHTML = '<p class="empty-post">Tento příspěvek nemá obsah.</p>');
   loadComments(post.filename || String(id));
-  
+
   logEvent(analytics, 'page_view', { page_title: post.title, page_location: location.href, page_path: post.filename });
   logEvent(analytics, 'screen_view', { firebase_screen: post.title, firebase_screen_class: 'PostView' });
 }
@@ -215,14 +215,14 @@ function renderWithPretext(htmlContent, container) {
   images.forEach(img => img.remove());
   if (!images.length) { container.innerHTML = doc.body.innerHTML; return; }
   const blocks = [...doc.body.childNodes].filter(n => n.nodeType === 1 ? n.textContent.trim() : n.textContent.trim());
-  
+
   const containerWidth = container.closest('#post-view')?.offsetWidth || 680;
   const isMobile = containerWidth < 500;
-  
+
   const IMG_W = isMobile ? containerWidth : Math.floor(containerWidth * 0.40);
   const GAP = isMobile ? 0 : 24;
   const TEXT_W = isMobile ? containerWidth : (containerWidth - IMG_W - GAP);
-  
+
   const FONT = '24px "Cormorant Garamond", Georgia, serif';
   const LINE_H = 24 * 1.9;
   const GROUP = 3;
@@ -240,11 +240,11 @@ function renderWithPretext(htmlContent, container) {
         const result = layout(prepared, TEXT_W, LINE_H);
         textHeight = result.height;
       }
-      
+
       const dir = (imgIdx % 2 === 0) ? 'right' : 'left';
       const section = document.createElement('div');
       section.className = 'pretext-section';
-      
+
       if (isMobile) {
         // Mobile: Stacked layout with better aspect ratio
         section.style.cssText = `display:block; margin-bottom:3.5em;`;
@@ -359,7 +359,7 @@ async function doSearch(q) {
   if (!fullSearchIndex) fullSearchIndex = await fetchJSON('data/search.json');
   const queries = q.toLowerCase().split(/\s+/).filter(x => x.length > 0);
   const results = fullSearchIndex.filter(p => {
-    const text = (p.title + ' ' + (p.tags||[]).join(' ') + ' ' + p.text).toLowerCase();
+    const text = (p.title + ' ' + (p.tags || []).join(' ') + ' ' + p.text).toLowerCase();
     return queries.every(word => text.includes(word));
   });
   postList.innerHTML = !results.length
